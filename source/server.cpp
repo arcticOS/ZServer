@@ -35,32 +35,71 @@
  * LIABILITY WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
- *
- * Drawing code based on https://github.com/JSBattista/Characters_To_Linux_Buffer_THE_HARD_WAY/blob/master/display.c
  */
 
-#include <display/framebuffer.hpp>
-#include <display/primitive.hpp>
+#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
 
+#include <display/framebuffer.hpp>
 #include <server.hpp>
 
-int main(int argc, char** argv) {
-    if(init_framebuffer() != 0) {
-        return -1;
-    }
+#define PORT 9247
 
-    if(init_server() != 0) {
+int server_fd;
+int new_socket;
+int valread;
+struct sockaddr_in address;
+int opt = 1;
+int addrlen = sizeof(address);
+char buffer[1024] = {0};
+
+int init_server() {
+    if((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
+        printf("FATAL: Socket setup failed\n");
+        release_framebuffer();
         return -2;
     }
 
-    for(;;) {
-        read();
-
-        // TODO: Accept commands
-        // TODO: Accept raw data
-
-        write("OK");
+    if(setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt))) {
+        printf("FATAL: Socket pre-bind failed\n");
+        release_framebuffer();
+        return -3;
     }
 
-    release_framebuffer();
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = INADDR_ANY;
+    address.sin_port = htons(PORT);
+
+    if(bind(server_fd, (struct sockaddr*) &address, sizeof(address)) < 0) {
+        printf("FATAL: Socket bind failed\n");
+        release_framebuffer();
+        return -4;
+    }
+
+    if(listen(server_fd, 3) < 0) {
+        printf("FATAL: Socket listen failed\n");
+        release_framebuffer();
+        return -5;
+    }
+
+    if((new_socket = accept(server_fd, (struct sockaddr*) &address, (socklen_t*) &addrlen)) < 0) {
+        printf("FATAL: Socket accept failed\n");
+        release_framebuffer();
+        return -6;
+    }
+    
+    return 0;
+}
+
+char* read() {
+    valread = read(new_socket, buffer, 1024);
+    return buffer;
+}
+
+void write(const char* message) {
+    send(new_socket, message, strlen(message), 0);
 }

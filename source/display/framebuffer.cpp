@@ -105,6 +105,8 @@ int init_framebuffer() {
             MAP_SHARED,
             fbfd,
             0);
+
+    return 0;
 }
 
 void release_framebuffer() {
