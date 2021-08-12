@@ -36,3 +36,10 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+ 
+int init_framebuffer();
+void release_framebuffer();
+
+void clear_screen(int c);
+
+void put_pixel(int x, int y, int c);

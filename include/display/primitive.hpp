@@ -36,3 +36,10 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+
+void fill_rect(int x, int y, int w, int h, int c);
+void draw_rect(int x, int y, int w, int h, int c);
+
+void draw_hline(int x1, int x2, int y, int c);
+void draw_vline(int y1, int y2, int x, int c);
+void draw_line(int x1, int y1, int x2, int y2, int c);
