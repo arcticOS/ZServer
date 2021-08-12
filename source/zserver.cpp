@@ -46,11 +46,15 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/ioctl.h>
+#include <sys/socket.h>
 #include <linux/fb.h>
 #include <linux/kd.h>
 #include <linux/ioctl.h>
+#include <netinet/in.h>
 
 #include <zserver.hpp>
+
+#define PORT 9247
 
 int fbfd = 0;
 char *fbp = 0;
@@ -62,7 +66,7 @@ int page_size = 0;
 int cur_page = 0;
 
 int main(int argc, char** argv) {
-    // Startup code
+    // Framebuffer startup code
     struct fb_var_screeninfo orig_vinfo;
     long int screensize = 0;
 
@@ -109,10 +113,62 @@ int main(int argc, char** argv) {
               fbfd,
               0);
 
+    // Server startup code
+    int server_fd;
+    int new_socket;
+    int valread;
+    struct sockaddr_in address;
+    int opt = 1;
+    int addrlen = sizeof(address);
+    char buffer[1024] = {0};
+    
+    if((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
+        printf("FATAL: Socket setup failed\n");
+        release_framebuffer(screensize, kbfd, orig_vinfo);
+        return -2;
+    }
 
-    for(int x = 0; x < 1024; x++)
-        fill_rect(100, 100, 256, 256, 0xFF);
+    if(setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt))) {
+        printf("FATAL: Socket pre-bind failed\n");
+        release_framebuffer(screensize, kbfd, orig_vinfo);
+        return -3;
+    }
 
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = INADDR_ANY;
+    address.sin_port = htons(PORT);
+
+    if(bind(server_fd, (struct sockaddr*) &address, sizeof(address)) < 0) {
+        printf("FATAL: Socket bind failed\n");
+        release_framebuffer(screensize, kbfd, orig_vinfo);
+        return -4;
+    }
+
+    if(listen(server_fd, 3) < 0) {
+        printf("FATAL: Socket listen failed\n");
+        release_framebuffer(screensize, kbfd, orig_vinfo);
+        return -5;
+    }
+
+    if((new_socket = accept(server_fd, (struct sockaddr*) &address, (socklen_t*) &addrlen)) < 0) {
+        printf("FATAL: Socket accept failed\n");
+        release_framebuffer(screensize, kbfd, orig_vinfo);
+        return -6;
+    }
+
+    for(;;) {
+        valread = read(new_socket, buffer, 1024);
+
+        // TODO: Accept commands
+        // TODO: Accept raw data
+
+        send(new_socket, "OK", strlen("OK"), 0);
+    }
+
+    release_framebuffer(screensize, kbfd, orig_vinfo);
+}
+
+void release_framebuffer(long int screensize, int kbfd, struct fb_var_screeninfo orig_vinfo) {
     munmap(fbp, screensize);
     // reset cursor
     if (kbfd >= 0) {
@@ -141,6 +197,7 @@ void put_pixel(int x, int y, int c) {
 }
 
 void fill_rect(int x, int y, int w, int h, int c) {
+    h /= 4; // What the fuck
     for(int cx = x; cx < x + w; cx++) {
         for(int cy = y; cy < y + h; cy++) {
             put_pixel(cx, cy, c);

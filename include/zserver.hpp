@@ -37,6 +37,8 @@
  * THE SOFTWARE.
  */
  
+void release_framebuffer(long int screensize, int kbfd, struct fb_var_screeninfo orig_vinfo);
+
 void clear_screen(int c);
 
 void put_pixel(int x, int y, int c);
