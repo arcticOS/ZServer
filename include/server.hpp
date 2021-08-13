@@ -38,5 +38,6 @@
  */
 
 int init_server();
-char* read();
-void write(const char* message);
+int init_connection();
+char* server_read();
+void server_write(const char* message);

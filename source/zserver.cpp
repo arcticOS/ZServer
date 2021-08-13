@@ -39,28 +39,78 @@
  * Drawing code based on https://github.com/JSBattista/Characters_To_Linux_Buffer_THE_HARD_WAY/blob/master/display.c
  */
 
+#include <unistd.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <signal.h>
+
 #include <display/framebuffer.hpp>
 #include <display/primitive.hpp>
 
 #include <server.hpp>
 
+#include <zserver.hpp>
+
+#define COLOR_WHITE 0xFF
+#define COLOR_BLACK 0x00
+
+#define COMMAND_CLEAR 0x0000
+#define COMMAND_PIXEL 0x0001
+
 int main(int argc, char** argv) {
+    signal(SIGINT, clean_shutdown); // Make sure we release the framebuffer when exiting manually
+
+    // Grab the framebuffer
+    // NOTE: this will not work if using X already
     if(init_framebuffer() != 0) {
         return -1;
     }
 
+    // Start socket handler
+    // NOTE: we don't need multi-connection handling here
     if(init_server() != 0) {
         return -2;
     }
 
+    // Execute ~/.zinitrc by forking and using system() to call .zinitrc
+    // This is (technically) insecure, but isn't an issue since we're already execing a shell script anyway here
+    if(fork() == 0) {
+        system("bash $HOME/.zinitrc");
+        exit(0);
+    }
+
+    // Listen for connection
+    if(init_connection() != 0) {
+        return -3;
+    }
+
     for(;;) {
-        read();
+        char* buffer = server_read();
+
+        // First two bytes: Command
+        uint16_t command = buffer[0] << 8;
+        command |= buffer[1];
+
+        // Clear
+        if(command == COMMAND_CLEAR) {
+            clear_screen(COLOR_WHITE);
+        } else if(command == COMMAND_PIXEL) {
+            // Third byte: X
+            // Fourth byte: Y
+            // Fifth byte: Color
+            put_pixel(buffer[2], buffer[3], buffer[4]);
+        } 
 
         // TODO: Accept commands
         // TODO: Accept raw data
 
-        write("OK");
+        server_write("OK");
     }
 
     release_framebuffer();
+}
+
+void clean_shutdown(int dummy) {
+	release_framebuffer();
+	exit(0);
 }

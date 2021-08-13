@@ -85,21 +85,26 @@ int init_server() {
         release_framebuffer();
         return -5;
     }
-
-    if((new_socket = accept(server_fd, (struct sockaddr*) &address, (socklen_t*) &addrlen)) < 0) {
-        printf("FATAL: Socket accept failed\n");
-        release_framebuffer();
-        return -6;
-    }
     
     return 0;
 }
 
-char* read() {
+int init_connection() {
+    if((new_socket = accept(server_fd, (struct sockaddr*) &address, (socklen_t*) &addrlen)) != 0) {
+        printf("FATAL: Socket accept failed\n");
+        release_framebuffer();
+        return -6;
+    }
+    return 0;
+}
+
+char* server_read() {
+    memset(buffer, 0x00, 1024);
     valread = read(new_socket, buffer, 1024);
     return buffer;
 }
 
-void write(const char* message) {
+void server_write(const char* message) {
     send(new_socket, message, strlen(message), 0);
 }
+
